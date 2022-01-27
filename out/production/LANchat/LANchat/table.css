@@ -11,10 +11,16 @@
 }
 
 .table-view .column-header, .table-view .filler {
-    -fx-border-width: 0 0 10 0;
+    /*-fx-border-width: 0 0 10 0;*/
     -fx-background-color: transparent;
 }
 
 .table-view .column-header .label {
     -fx-text-fill: #44447f;
+    -fx-font-size: 13;
+}
+
+.table-row-cell {
+    -fx-font-size: 12;
+    -fx-text-alignment: center;
 }

@@ -65,9 +65,6 @@ public class loginController {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-
-                    alrt.setAlertType(Alert.AlertType.CONFIRMATION);
-                    alrt.setContentText("You have logged in Successfully. Enjoy!!! \n\n");
                 } else {
                     alrt.setAlertType(Alert.AlertType.ERROR);
                     alrt.setContentText("You have entered a wrong password. \n" +
@@ -75,8 +72,6 @@ public class loginController {
                             "or click forgot password.\n");
                 }
             }
-            alrt.show();
-
             conDB.close();
         } catch (Exception e) {
             e.printStackTrace();

@@ -1,15 +1,24 @@
 package LANchat;
 
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -32,31 +41,16 @@ public class Controller implements Initializable{
     private Label fileNameLabel;
 
     @FXML
-    private Label recieverText1;
-
-    @FXML
-    private Label recieverText2;
-
-    @FXML
-    private Label recieverText3;
-
-    @FXML
-    private Label recieverText4;
+    private Button onlineButton;
 
     @FXML
     private TextField searchField;
 
     @FXML
-    private Label senderText1;
+    private ScrollPane messageScreen;
 
     @FXML
-    private Label senderText2;
-
-    @FXML
-    private Label senderText3;
-
-    @FXML
-    private Label senderText4;
+    private VBox messageVbox;
 
     @FXML
     private TableView<UsersList> tableView;
@@ -67,46 +61,148 @@ public class Controller implements Initializable{
     @FXML
     private TextArea writeMessage;
 
+    FXMLLoader fxmlLoader = new FXMLLoader();
+
     Alert alrt = new Alert(Alert.AlertType.NONE);
+
+    DBconnection conNow = new DBconnection();
 
     final FileChooser fc = new FileChooser();
 
     public static String uname;
+
     SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     Date date = new Date();
 
     ObservableList<UsersList> obList = FXCollections.observableArrayList();
 
-    public void setCurrentUser(String name) {
-        this.currentUser.setText(name);
-    }
-
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         try {
-            DBconnection conNow = new DBconnection();
             Connection conDB = conNow.getConnection();
 
-            String qury = "select username from Users where username != '" + uname + "'";
+            String qury = "select username from Users where username != '" + uname + "' and active = 1";
 
             ResultSet rs = conDB.createStatement().executeQuery(qury);
 
             while (rs.next()) {
                 obList.add(new UsersList(rs.getString("username")));
             }
+//
+//            String quryMsg = "select username from Users where username != '" + uname + "'";
+//
+//            ResultSet rsMsg = conDB.createStatement().executeQuery(quryMsg);
 
+            conDB.close();
         } catch (Exception e) {
             Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
             e.printStackTrace();
         }
 
         userTable.setCellValueFactory(new PropertyValueFactory<UsersList, String>("username"));
-
         tableView.setItems(obList);
-
         currentUser.setText(uname);
+        messageScreen.setFitToWidth(true);
 
+        messageVbox.heightProperty().addListener(new ChangeListener<Number>() {
+            @Override
+            public void changed(ObservableValue<? extends Number> observableValue, Number oldValue, Number newValue) {
+                messageScreen.setVvalue((Double) newValue);
+            }
+        });
+
+
+
+        tableView.getSelectionModel().selectedItemProperty().addListener(new ChangeListener<UsersList>() {
+            @Override
+            public void changed(ObservableValue<? extends UsersList> observableValue, UsersList usersList, UsersList t1) {
+                Connection conDB = conNow.getConnection();
+                UsersList row = tableView.getSelectionModel().getSelectedItem();
+                messageVbox.getChildren().clear();
+                try {
+                    String withUser = row.getUsername();
+                    String tableName = "message_" + uname;
+                    String qury = "select * from " + tableName + " where withUser = '" + withUser + "' ";
+
+                    ResultSet rs = conDB.createStatement().executeQuery(qury);
+                    while (rs.next() != false) {
+                        HBox hbox = new HBox();
+                        Text txtMsg = new Text(rs.getString("message"));
+                        Text txtTime = new Text(rs.getString("timeSent"));
+                        TextFlow txtTimFlw = new TextFlow(txtTime);
+                        TextFlow txtFlow = new TextFlow(txtMsg);
+
+                        if (rs.getString("status").equals("Received")) {
+                            hbox.setAlignment(Pos.CENTER_LEFT);
+                            hbox.setPadding(new Insets(5, 5, 5, 10));
+
+                            txtFlow.setStyle("-fx-background-color: rgb(0,10,0); " +
+                                    "-fx-background-radius: 15px;");
+
+                            txtFlow.setPadding(new Insets(5, 10, 5, 10));
+                            txtMsg.setFill(Color.color(0.934, 0.945, 0.996));
+
+//                            txtTimFlw.setStyle("-fx-background-color: rgb(0,10,0); " +
+//                                    "-fx-background-radius: 20px;");
+
+                            txtTimFlw.setPadding(new Insets(2, 4, 2, 4));
+                            txtTime.setStyle("-fx-font-size: 8");
+                            txtTime.setFill(Color.color(0.934, 0.945, 0.996));
+
+                            hbox.getChildren().add(txtFlow);
+                            messageVbox.getChildren().add(hbox);
+                            messageVbox.getChildren().add(txtTimFlw);
+                        } else if (rs.getString("status").equals("Sent")) {
+                            hbox.setAlignment(Pos.CENTER_RIGHT);
+                            hbox.setPadding(new Insets(5, 5, 5, 10));;
+
+                            txtFlow.setStyle("-fx-color: rgb(239,242,255); " +
+                                    "-fx-background-color: rgb(15,125,242); " +
+                                    "-fx-background-radius: 20px;");
+
+                            txtFlow.setPadding(new Insets(5, 10, 5, 10));
+                            txtMsg.setFill(Color.color(0.934, 0.945, 0.996));
+
+                            hbox.getChildren().add(txtFlow);
+                            messageVbox.getChildren().add(hbox);
+                        }
+                    }
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
     }
+
+    @FXML
+    void online_clicked(ActionEvent event) {
+        tableView.getItems().clear();
+            try {
+                Connection conDB = conNow.getConnection();
+                String qury;
+
+                if (onlineButton.getText().equals("Online Users")) {
+                    onlineButton.setText("Offline Users");
+                    qury = "select username from Users where username != '" + uname + "' and active = 0";
+                } else {
+                    onlineButton.setText("Online Users");
+                    qury = "select username from Users where username != '" + uname + "' and active = 1";
+                }
+                ResultSet rs = conDB.createStatement().executeQuery(qury);
+
+                while (rs.next()) {
+                    obList.add(new UsersList(rs.getString("username")));
+                }
+
+                conDB.close();
+            } catch (Exception e) {
+                Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
+                e.printStackTrace();
+            }
+
+            userTable.setCellValueFactory(new PropertyValueFactory<UsersList, String>("username"));
+            tableView.setItems(obList);
+        }
 
     @FXML
     void attachClicked(ActionEvent event) {
@@ -121,7 +217,6 @@ public class Controller implements Initializable{
     @FXML
     void logOutClicked(ActionEvent event) {
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader();
             fxmlLoader.setLocation(getClass().getResource("Login.fxml"));
             Scene scene = new Scene(fxmlLoader.load());
             Stage stage = new Stage();
@@ -139,17 +234,16 @@ public class Controller implements Initializable{
     void refreshClicked(ActionEvent event) {
         tableView.getItems().clear();
         try {
-            DBconnection conNow = new DBconnection();
             Connection conDB = conNow.getConnection();
 
-            String qury = "select username from Users where username != '" + uname + "'";
+            String qury = "select username from Users where username != '" + uname + "' and active = 1";
 
             ResultSet rs = conDB.createStatement().executeQuery(qury);
 
             while (rs.next()) {
                 obList.add(new UsersList(rs.getString("username")));
             }
-
+            conDB.close();
         } catch (Exception e) {
             Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
             e.printStackTrace();
@@ -157,14 +251,13 @@ public class Controller implements Initializable{
 
         userTable.setCellValueFactory(new PropertyValueFactory<UsersList, String>("username"));
         tableView.setItems(obList);
-
     }
 
     @FXML
     void searchClicked(ActionEvent event) {
         tableView.getItems().clear();
+
         try {
-            DBconnection conNow = new DBconnection();
             Connection conDB = conNow.getConnection();
 
             String qury = "select username from Users where username != '" + uname + "' and username like '%" + searchField.getText().toString() + "%'";
@@ -174,6 +267,7 @@ public class Controller implements Initializable{
             while (rs.next()) {
                 obList.add(new UsersList(rs.getString("username")));
             }
+            conDB.close();
         } catch (Exception e) {
             Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
             e.printStackTrace();
@@ -185,90 +279,58 @@ public class Controller implements Initializable{
 
     @FXML
     void sendClicked(ActionEvent event) throws SQLException {
-        if (senderText1.getText() != "") {
-            if (senderText2.getText() != "") {
-                if (senderText3.getText() != "") {
-                    senderText4.setText(senderText3.getText());
-                    senderText3.setText("");
-                    recieverText4.setText("");
-                } else if (recieverText3.getText() != "") {
-                    recieverText4.setText(recieverText3.getText());
-                    recieverText3.setText("");
-                }
-                senderText3.setText(senderText2.getText());
-                senderText2.setText("");
-            } else if (recieverText2.getText() != "") {
-                recieverText3.setText(recieverText2.getText());
-                recieverText2.setText("");
-            }
-            senderText2.setText(senderText1.getText());
-            senderText1.setText("");
-        } else if (recieverText1.getText() != "") {
-            if (recieverText2.getText() != "") {
-                if (recieverText3.getText() != "") {
-                    recieverText4.setText(recieverText3.getText());
-                    recieverText3.setText("");
-                    senderText4.setText("");
-                } else if (senderText4.getText() != "") {
-                    senderText4.setText(senderText3.getText());
-                    senderText3.setText("");
-                }
-                recieverText3.setText(recieverText2.getText());
-                recieverText2.setText("");
-            } else if (senderText2.getText() != "") {
-                senderText3.setText(senderText2.getText());
-                senderText2.setText("");
-            }
-            recieverText2.setText(recieverText1.getText());
-            recieverText1.setText("");
+
+        if (writeMessage.getText().isEmpty()) {
+            return;
         }
 
-        senderText1.setText(writeMessage.getText());
+        HBox hbox = new HBox();
 
+        hbox.setAlignment(Pos.CENTER_RIGHT);
+        hbox.setPadding(new Insets(5, 5, 5, 10));
+
+        Text txtMsg = new Text(writeMessage.getText());
+        TextFlow txtFlow = new TextFlow(txtMsg);
+
+        txtFlow.setStyle("-fx-color: rgb(239,242,255); " +
+                "-fx-background-color: rgb(15,125,242); " +
+                "-fx-background-radius: 20px;");
+
+        txtFlow.setPadding(new Insets(5,10,5,10));
+        txtMsg.setFill(Color.color(0.934, 0.945, 0.996));
+
+        hbox.getChildren().add(txtFlow);
+        messageVbox.getChildren().add(hbox);
 
         try {
-            DBconnection conNow = new DBconnection();
-            Connection conDB = conNow.getConnection();
-            Statement stat = conDB.createStatement();
-            String tableName = "message_" + uname;
-
-            String qury = "INSERT INTO " + tableName + " (reciever, message, timeSent, status)" +
-                    "VALUES ('" + tableView.getSelectionModel().getSelectedItem().toString() + "', '"
-                    + writeMessage.getText() + "', '" + date.getTime() + "', 'Sent')";
-
-            stat.executeUpdate(qury);
-
-        } catch (SQLSyntaxErrorException ex) {
-            DBconnection conNow = new DBconnection();
-            Connection conDB = conNow.getConnection();
-            Statement stat = conDB.createStatement();
-            String tableName = "message_" + uname;
-
-            String qury = "create table " + tableName + " (reciever varchar(100), message TEXT(64000), timeSent varchar(32), status varchar(16))";
-
-            stat.executeUpdate(qury);
-
-            qury = "INSERT INTO " + tableName + " (reciever, message, timeSent, status)" +
-                    "VALUES ('" + tableView.getSelectionModel().getSelectedItem().toString() + "', '"
-                    + writeMessage.getText() + "', '" + date.getTime() + "', 'Sent')";
-
-            stat.executeUpdate(qury);
-        }
-        catch (Exception e) {
             UsersList row = tableView.getSelectionModel().getSelectedItem();
-            System.out.println(row.getUsername());
-            System.out.println(formatter.format(date));
-//            Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
+            Connection conDB = conNow.getConnection();
+            Statement stat = conDB.createStatement();
+            String tableName = "message_" + uname;
+            String receiverTable = "message_" + row.getUsername();
+
+            String qury = "INSERT INTO " + tableName + " (withUser, message, timeSent, status)" +
+                    "VALUES ('" + row.getUsername() + "', '"
+                    + writeMessage.getText() + "', '" + formatter.format(date) + "', 'Sent')";
+
+            String qury2 = "INSERT INTO " + receiverTable + " (withUser, message, timeSent, status)" +
+                    "VALUES ('" + uname + "', '"
+                    + writeMessage.getText() + "', '" + formatter.format(date) + "', 'Received')";
+
+            stat.executeUpdate(qury);
+            stat.executeUpdate(qury2);
+            conDB.close();
+        } catch (Exception e) { // any exception catcher and printer to the log viewer
+            Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, null, e);
             e.printStackTrace();
         }
-
         writeMessage.setText("");
     }
 
     @FXML
     void settingsClicked(ActionEvent event) {
+        // settings window opener
         try {
-            FXMLLoader fxmlLoader = new FXMLLoader();
             fxmlLoader.setLocation(getClass().getResource("Setting.fxml"));
             Scene scene = new Scene(fxmlLoader.load());
             Stage stage = new Stage();
